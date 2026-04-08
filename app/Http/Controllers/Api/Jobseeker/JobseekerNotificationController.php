@@ -3,11 +3,38 @@
 namespace App\Http\Controllers\Api\Jobseeker;
 
 use App\Http\Controllers\Controller;
+use App\Models\Application;
 use App\Models\NotificationRead;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class JobseekerNotificationController extends Controller
 {
+    private function hydrateInterviewMetaFromApplication(NotificationRead $notificationRead): void
+    {
+        $notification = $notificationRead->notification;
+        if (! $notification) return;
+
+        if (($notification->type ?? null) !== 'status_interview') return;
+        if (! empty($notification->meta)) return;
+
+        $jobListingId = $notification->job_listing_id;
+        if (! $jobListingId) return;
+
+        $app = Application::where('job_listing_id', $jobListingId)
+            ->where('jobseeker_id', $notificationRead->recipient_id)
+            ->first();
+        if (! $app) return;
+
+        $notification->meta = [
+            'interview_date'     => ! empty($app->interview_date) ? Carbon::parse($app->interview_date)->format('F d, Y') : 'TBA',
+            'interview_time'     => ! empty($app->interview_time) ? Carbon::parse($app->interview_time)->format('h:i A') : 'TBA',
+            'interview_format'   => $app->interview_format ?: 'In-person',
+            'interview_location' => $app->interview_location ?: 'TBA',
+            'interviewer_name'   => $app->interviewer_name ?: 'Hiring Manager',
+        ];
+    }
+
     public function index(Request $request)
     {
         $jobseeker = $request->user();
@@ -31,6 +58,14 @@ class JobseekerNotificationController extends Controller
 
         $notifications = $query->orderByDesc('created_at')->paginate(15);
 
+        // Backfill interview schedule details for older notifications that have no meta.
+        $notifications->getCollection()->transform(function ($nr) {
+            if ($nr instanceof NotificationRead) {
+                $this->hydrateInterviewMetaFromApplication($nr);
+            }
+            return $nr;
+        });
+
         return response()->json([
             'success' => true,
             'data' => $notifications,
@@ -45,6 +80,8 @@ class JobseekerNotificationController extends Controller
             ->where('recipient_id', $jobseeker->id)
             ->with('notification')
             ->findOrFail($id);
+
+        $this->hydrateInterviewMetaFromApplication($notificationRead);
         
         // Mark as read when viewed
         $notificationRead->markAsRead();
