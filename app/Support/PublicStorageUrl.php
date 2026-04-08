@@ -26,6 +26,13 @@ final class PublicStorageUrl
 
         $stored = ltrim($stored, '/');
 
+        // Mobile apps can be picky about some R2 domains/edge behavior.
+        // For employer photos specifically, always go through our API proxy,
+        // so the client fetches from the Railway domain.
+        if (str_starts_with($stored, 'employers/photos/')) {
+            return $request->getSchemeAndHttpHost() . '/api/public/storage/' . $stored;
+        }
+
         // Prefer the configured "public" disk (local OR S3/R2).
         // Relying on Storage::url() ties URL generation to the *default* disk which can differ per env.
         try {
