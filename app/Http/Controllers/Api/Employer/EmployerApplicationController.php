@@ -306,6 +306,12 @@ class EmployerApplicationController extends Controller
                     $message = "Thank you for your interest in the **{$job->title}** position at **{$company}**. Unfortunately, the employer has decided not to proceed with your application at this time.";
                     $type = 'status_rejected';
 
+                    $rejectedMeta = [
+                        'job_title'    => $job->title,
+                        'company_name' => $company,
+                        'update_date'  => now()->format('F d, Y'),
+                    ];
+
                     try {
                         $mj = new \Mailjet\Client(env('MAILJET_API_KEY'), env('MAILJET_SECRET_KEY'), true, ['version' => 'v3.1']);
                         $body = [
@@ -344,7 +350,7 @@ class EmployerApplicationController extends Controller
                 'message'        => $message,
                 'type'           => $type,
                 'job_listing_id' => $job->id,
-                'meta'           => $interviewMeta ?? $hiredMeta ?? null,
+                'meta'           => $interviewMeta ?? $hiredMeta ?? $rejectedMeta ?? null,
                 'recipients'     => 'jobseekers',
                 'scheduled_at'   => null,
                 'sent_at'        => now(),

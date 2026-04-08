@@ -52,6 +52,20 @@ class JobseekerNotificationController extends Controller
                 'employment_type' => $jobListing->job_type ?? 'Full-time',
             ];
         }
+
+        // ── Rejected backfill ────────────────────────────────────────────────
+        if ($type === 'status_rejected' && empty($notification->meta)) {
+            $jobListing = $notification->jobListing;
+            if (! $jobListing) return;
+
+            $notification->meta = [
+                'job_title'    => $jobListing->title ?? 'N/A',
+                'company_name' => $jobListing->employer->company_name ?? 'N/A',
+                'update_date'  => $notification->created_at
+                    ? Carbon::parse($notification->created_at)->format('F d, Y')
+                    : now()->format('F d, Y'),
+            ];
+        }
     }
 
     public function index(Request $request)
