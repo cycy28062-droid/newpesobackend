@@ -256,6 +256,14 @@ class EmployerApplicationController extends Controller
                     $message = "Outstanding! You have been officially hired for **{$job->title}** at **{$company}**. Welcome to the team!";
                     $type = 'status_hired';
 
+                    $hiredMeta = [
+                        'job_title'       => $job->title,
+                        'company_name'    => $company,
+                        'start_date'      => !empty($request->input('start_date')) ? \Carbon\Carbon::parse($request->input('start_date'))->format('F d, Y') : 'To be discussed',
+                        'salary'          => $job->salary_range ?? 'Negotiable',
+                        'employment_type' => $job->job_type ?? 'Full-time',
+                    ];
+
                     try {
                         $mj = new \Mailjet\Client(env('MAILJET_API_KEY'), env('MAILJET_SECRET_KEY'), true, ['version' => 'v3.1']);
                         $body = [
@@ -336,7 +344,7 @@ class EmployerApplicationController extends Controller
                 'message'        => $message,
                 'type'           => $type,
                 'job_listing_id' => $job->id,
-                'meta'           => $interviewMeta ?? null,
+                'meta'           => $interviewMeta ?? $hiredMeta ?? null,
                 'recipients'     => 'jobseekers',
                 'scheduled_at'   => null,
                 'sent_at'        => now(),

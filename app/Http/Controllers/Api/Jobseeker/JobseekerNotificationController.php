@@ -15,24 +15,43 @@ class JobseekerNotificationController extends Controller
         $notification = $notificationRead->notification;
         if (! $notification) return;
 
-        if (($notification->type ?? null) !== 'status_interview') return;
-        if (! empty($notification->meta)) return;
+        $type = $notification->type ?? null;
 
-        $jobListingId = $notification->job_listing_id;
-        if (! $jobListingId) return;
+        // ── Interview backfill ───────────────────────────────────────────────
+        if ($type === 'status_interview' && empty($notification->meta)) {
+            $jobListingId = $notification->job_listing_id;
+            if (! $jobListingId) return;
 
-        $app = Application::where('job_listing_id', $jobListingId)
-            ->where('jobseeker_id', $notificationRead->recipient_id)
-            ->first();
-        if (! $app) return;
+            $app = Application::where('job_listing_id', $jobListingId)
+                ->where('jobseeker_id', $notificationRead->recipient_id)
+                ->first();
+            if (! $app) return;
 
-        $notification->meta = [
-            'interview_date'     => ! empty($app->interview_date) ? Carbon::parse($app->interview_date)->format('F d, Y') : 'TBA',
-            'interview_time'     => ! empty($app->interview_time) ? Carbon::parse($app->interview_time)->format('h:i A') : 'TBA',
-            'interview_format'   => $app->interview_format ?: 'In-person',
-            'interview_location' => $app->interview_location ?: 'TBA',
-            'interviewer_name'   => $app->interviewer_name ?: 'Hiring Manager',
-        ];
+            $notification->meta = [
+                'interview_date'     => ! empty($app->interview_date) ? Carbon::parse($app->interview_date)->format('F d, Y') : 'TBA',
+                'interview_time'     => ! empty($app->interview_time) ? Carbon::parse($app->interview_time)->format('h:i A') : 'TBA',
+                'interview_format'   => $app->interview_format ?: 'In-person',
+                'interview_location' => $app->interview_location ?: 'TBA',
+                'interviewer_name'   => $app->interviewer_name ?: 'Hiring Manager',
+            ];
+        }
+
+        // ── Hired backfill ───────────────────────────────────────────────────
+        if ($type === 'status_hired' && empty($notification->meta)) {
+            $jobListingId = $notification->job_listing_id;
+            if (! $jobListingId) return;
+
+            $jobListing = $notification->jobListing;
+            if (! $jobListing) return;
+
+            $notification->meta = [
+                'job_title'       => $jobListing->title ?? 'N/A',
+                'company_name'    => $jobListing->employer->company_name ?? 'N/A',
+                'start_date'      => 'To be discussed',
+                'salary'          => $jobListing->salary_range ?? 'Negotiable',
+                'employment_type' => $jobListing->job_type ?? 'Full-time',
+            ];
+        }
     }
 
     public function index(Request $request)
